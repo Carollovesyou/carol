@@ -59,6 +59,12 @@ const environments = [
 const petTypes = ["小型犬", "中型犬", "大型犬", "猫咪"] as const;
 const stores = ["滨江阳光店", "湖畔生活店", "城市花园店"];
 const slots = ["10:00", "12:30", "15:00", "18:30"];
+const arrivalOptions = [
+  { label: "提前 10 分钟", minutes: -10 },
+  { label: "提前 5 分钟", minutes: -5 },
+  { label: "准时到店", minutes: 0 },
+  { label: "延后 10 分钟", minutes: 10 },
+] as const;
 const addons: Addon[] = [
   { name: "指甲精修", price: 28 },
   { name: "牙齿清洁", price: 48 },
@@ -87,6 +93,15 @@ function formatDate(value: string) {
   const selected = new Date(`${value}T00:00:00`);
   if (value === todayInputValue()) return "今天";
   return `${selected.getMonth() + 1}月${selected.getDate()}日`;
+}
+
+function addMinutes(time: string, minutes: number) {
+  const [hours, minuteValue] = time.split(":").map(Number);
+  const totalMinutes = hours * 60 + minuteValue + minutes;
+  const normalized = (totalMinutes + 24 * 60) % (24 * 60);
+  const nextHours = Math.floor(normalized / 60);
+  const nextMinutes = normalized % 60;
+  return `${String(nextHours).padStart(2, "0")}:${String(nextMinutes).padStart(2, "0")}`;
 }
 
 function ServiceIcon({ icon }: { icon: Service["icon"] }) {
@@ -158,6 +173,7 @@ export default function Home() {
   const [phone, setPhone] = useState("138 0000 0000");
   const [date, setDate] = useState("");
   const [store, setStore] = useState(stores[0]);
+  const [arrivalOffset, setArrivalOffset] = useState<(typeof arrivalOptions)[number]["minutes"]>(-10);
   const [notes, setNotes] = useState("");
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
   const [toastVisible, setToastVisible] = useState(false);
@@ -175,6 +191,8 @@ export default function Home() {
     const addonTotal = chosenAddons.reduce((sum, addon) => sum + addon.price, 0);
     return selectedService.price + sizeAdjustments[petType] + addonTotal;
   }, [chosenAddons, petType, selectedService.price]);
+
+  const expectedArrivalTime = `${formatDate(date)} ${addMinutes(selectedTime, arrivalOffset)}`;
 
   function toggleAddon(addonName: string) {
     setSelectedAddons((current) =>
@@ -300,8 +318,17 @@ export default function Home() {
                   ))}
                 </select>
               </FieldLabel>
+              <FieldLabel label="期望到店时间">
+                <select className={fieldClass} value={arrivalOffset} onChange={(event) => setArrivalOffset(Number(event.target.value) as (typeof arrivalOptions)[number]["minutes"])}>
+                  {arrivalOptions.map((option) => (
+                    <option key={option.minutes} value={option.minutes}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </FieldLabel>
               <textarea
-                className={`${fieldClass} min-h-[88px] resize-y sm:col-span-2`}
+                className={`${fieldClass} min-h-[88px] resize-y`}
                 value={notes}
                 placeholder="护理师备注：例如怕吹风、皮肤敏感、需要轻柔梳毛等"
                 onChange={(event) => setNotes(event.target.value)}
@@ -347,6 +374,7 @@ export default function Home() {
             <SummaryLine label="宠物" value={`${petName.trim() || "未填写"} / ${petType}`} />
             <SummaryLine label="套餐" value={selectedService.name} />
             <SummaryLine label="时间" value={`${formatDate(date)} ${selectedTime}`} />
+            <SummaryLine label="期望到店" value={expectedArrivalTime} />
             <SummaryLine label="门店" value={store} />
             <SummaryLine label="附加护理" value={chosenAddons.length ? chosenAddons.map((addon) => addon.name).join("、") : "未选择"} />
             <div className="flex items-end justify-between gap-4 px-0 pt-[18px] pb-4">
